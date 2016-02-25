@@ -27,6 +27,11 @@ public:
 	bool IsActive();
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void SetActive(bool NewPickupState);
+
+	UFUNCTION(BlueprintNativeEvent, Category = "Pickup")
+	void WasCollected();
+	virtual void WasCollected_Implementation();
+
 protected:
 	//true为可用，false为无效
 	bool bIsActive;

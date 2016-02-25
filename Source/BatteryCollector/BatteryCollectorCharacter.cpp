@@ -2,6 +2,8 @@
 
 #include "BatteryCollector.h"
 #include "BatteryCollectorCharacter.h"
+#include "Pickup/Pickup.h"
+#include "Pickup/BatteryPickup.h"
 
 //////////////////////////////////////////////////////////////////////////
 // ABatteryCollectorCharacter
@@ -37,8 +39,19 @@ ABatteryCollectorCharacter::ABatteryCollectorCharacter()
 	FollowCamera->AttachTo(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+	//Create the Collection sphere
+	CollectionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollectionSphere"));
+	CollectionSphere -> AttachTo(RootComponent);
+	CollectionSphere->SetSphereRadius(200.f);
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
+
+	//设置玩家初始化Power
+	InititalPower = 2000.f;
+	CharacterPower = InititalPower;
+
+	SpeedFactor = 0.75f;
+	BaseSpeed = 10.0f;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -50,6 +63,8 @@ void ABatteryCollectorCharacter::SetupPlayerInputComponent(class UInputComponent
 	check(InputComponent);
 	InputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	InputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+
+	InputComponent->BindAction("Collect", IE_Pressed,this,&ABatteryCollectorCharacter::CollectPickups);
 
 	InputComponent->BindAxis("MoveForward", this, &ABatteryCollectorCharacter::MoveForward);
 	InputComponent->BindAxis("MoveRight", this, &ABatteryCollectorCharacter::MoveRight);
@@ -124,4 +139,49 @@ void ABatteryCollectorCharacter::MoveRight(float Value)
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
 	}
+}
+
+void ABatteryCollectorCharacter::CollectPickups()
+{
+	TArray<AActor*> CollectedActors;
+	CollectionSphere->GetOverlappingActors(CollectedActors);
+	float CollectedPower = 0.f;
+	for (int32 iCollected = 0; iCollected < CollectedActors.Num();++iCollected )
+	{
+		APickup* const TestPickup = Cast<APickup>(CollectedActors[iCollected]);
+		if ( TestPickup && !TestPickup->IsPendingKill()&& TestPickup->IsActive())
+		{
+			TestPickup->WasCollected();
+			ABatteryPickup * TestBattery = Cast<ABatteryPickup>(TestPickup);
+			if ( TestBattery )
+			{
+				CollectedPower += TestBattery->GetPower();
+			}
+			TestPickup->SetActive(false);
+		}
+	}
+	if (CollectedPower > 0)
+	{
+		UpdatePower(CollectedPower);
+	}
+}
+
+//获取初始化Power
+float ABatteryCollectorCharacter::GetInitialPower()
+{
+	return InititalPower;
+}
+
+//获取当前Power
+float ABatteryCollectorCharacter::GetCurrentPower()
+{
+	return CharacterPower;
+}
+
+//更新玩家的Power
+void ABatteryCollectorCharacter::UpdatePower(float PowerChange)
+{
+	CharacterPower += PowerChange;
+	GetCharacterMovement()->MaxWalkSpeed = BaseSpeed + SpeedFactor * CharacterPower;
+	PowerChangeEffect();
 }
