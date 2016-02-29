@@ -5,6 +5,7 @@
 #include "BatteryCollectorCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
+#include "SpawnVolume/SpawnVolume.h"
 
 ABatteryCollectorGameMode::ABatteryCollectorGameMode()
 {
@@ -20,6 +21,19 @@ ABatteryCollectorGameMode::ABatteryCollectorGameMode()
 void ABatteryCollectorGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	//获取Actor
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ASpawnVolume::StaticClass(), FoundActors);
+	for (auto Actor : FoundActors)
+	{
+		ASpawnVolume * SpawnVolumeActor = Cast<ASpawnVolume>(Actor);
+		if (SpawnVolumeActor)
+		{
+			SpawnVolumeActors.AddUnique(SpawnVolumeActor);
+		}
+	}
+
 	SetCurrentState(EBatteryPlaystate::EPlaying);
 	ABatteryCollectorCharacter * MyCharacter = Cast<ABatteryCollectorCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (MyCharacter )
@@ -70,4 +84,56 @@ EBatteryPlaystate ABatteryCollectorGameMode::GetCurrentState() const
 void ABatteryCollectorGameMode::SetCurrentState(EBatteryPlaystate NewState)
 {
 	CurrentState = NewState;
+	HandleNewsState(CurrentState);
+}
+
+void ABatteryCollectorGameMode::HandleNewsState(EBatteryPlaystate NewState)
+{
+	switch (NewState)
+	{
+	case  EBatteryPlaystate::EPlaying:
+		{
+			for ( ASpawnVolume * volume : SpawnVolumeActors)
+			{
+				volume->SetSpawningActive(true);
+			}
+		}
+		break;
+	case  EBatteryPlaystate::EWon:
+		{
+			for (ASpawnVolume * volume : SpawnVolumeActors)
+			{
+				volume->SetSpawningActive(false);
+			}
+		}
+		break;
+	case  EBatteryPlaystate::EGameOver:
+		{
+			for (ASpawnVolume * volume : SpawnVolumeActors)
+			{
+				volume->SetSpawningActive(false);
+			}
+			//屏蔽玩家输入
+			APlayerController * PlayerController = UGameplayStatics::GetPlayerController(this,0);
+			if (PlayerController)
+			{
+				PlayerController->SetCinematicMode(true, false, false, true, true);
+			}
+			ACharacter * MyCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);
+			ABatteryCollectorCharacter * BatteryCollectorCharacter = Cast<ABatteryCollectorCharacter>(MyCharacter);
+			if (MyCharacter)
+			{
+				MyCharacter->GetMesh()->SetSimulatePhysics(true);
+				MyCharacter->GetMovementComponent()->MovementState.bCanJump = false;
+			}
+
+		}
+		break;
+	case  EBatteryPlaystate::EUnknow:
+	default:
+		{
+
+		}
+		break;
+	}
 }

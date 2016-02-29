@@ -45,6 +45,9 @@ protected:
 
 private:
 	EBatteryPlaystate CurrentState;
+	TArray<class ASpawnVolume*> SpawnVolumeActors;
+
+	void HandleNewsState(EBatteryPlaystate NewState);
 };
 
 
